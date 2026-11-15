@@ -57,8 +57,21 @@ class LLMFinding(BaseModel):
         return int(v)
 
 
+class DismissedSignal(BaseModel):
+    """A pre-check lead the model looked at and judged not to be a problem."""
+
+    signal: str
+    reason: str = ""
+
+    @field_validator("signal", mode="before")
+    @classmethod
+    def _as_text(cls, v: object) -> str:
+        return str(v).strip()
+
+
 class LLMReviewOutput(BaseModel):
     findings: list[LLMFinding] = Field(default_factory=list)
+    dismissed_signals: list[DismissedSignal] = Field(default_factory=list)
 
 
 class Finding(BaseModel):
@@ -148,6 +161,7 @@ class AgentResult(BaseModel):
     latency_ms: int = 0
     error: str | None = None
     used_fallback: bool = False
+    dismissed_signals: list[dict[str, str]] = Field(default_factory=list)  # leads the model rejected, with reasons
 
     @property
     def completed(self) -> bool:

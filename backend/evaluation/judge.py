@@ -69,7 +69,12 @@ def match_case(case: GoldenCase, findings: list[dict[str, Any]], decision: str, 
             counts[0] += 1
         else:
             where = f"{exp.file}:{exp.line}" if exp.line else exp.file
-            score.missed.append(f"{exp.agent}/{'|'.join(exp.categories)} at {where}")
+            nearby = [
+                f"{f['agent_type']}/{f['category']} {f['severity']} L{f['line_start']} ({f['status']})"
+                for f in findings if f["file_path"] == exp.file
+            ]
+            note = f" (reported in that file: {'; '.join(nearby[:4])})" if nearby else " (nothing reported in that file)"
+            score.missed.append(f"{exp.agent}/{'|'.join(exp.categories)} at {where}{note}")
     for f in surfaced:
         if f["category"] in case.forbid:
             score.forbidden_hits.append(f"{f['agent_type']}/{f['category']} at {f['file_path']}:{f['line_start']}")

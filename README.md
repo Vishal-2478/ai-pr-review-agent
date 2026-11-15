@@ -42,6 +42,18 @@ escalation (priority 402): 1 critical finding(s): a human decides, regardless of
   approved by demo-reviewer -> {'status': 'approved', 'accepted': 2, 'rejected': 0, 'publishing': True}
 ```
 
+On Windows (cmd), there is no `make`, and the venv is activated differently:
+
+```bat
+python -m venv venv
+venv\Scripts\activate.bat
+pip install -e ".[dev]"
+python -m backend.cli demo --case hardcoded-secret --approve
+```
+
+`make test` is `python -m pytest -q`, `make eval` is `python -m backend.cli eval`. Put API keys in a `.env`
+file in the project folder (it is git-ignored), never in `.env.example`.
+
 Three things to notice: the critical finding went to a person no matter how confident the agent was, the
 secret's value is masked everywhere, and after approval the public review mentions only the test gap,
 because a vulnerability is never detailed on a public thread unless a maintainer chooses to.
@@ -155,7 +167,7 @@ Default models are `claude-opus-5-5` / `claude-sonnet-5-5` / `claude-haiku-5-5` 
 ## Verification
 
 ```bash
-make test              # 148 tests; Postgres and Redis tests run when TEST_DATABASE_URL / TEST_REDIS_URL are set
+make test              # 158 tests; Postgres and Redis tests run when TEST_DATABASE_URL / TEST_REDIS_URL are set
 make eval              # golden set of 17 pull requests + regression gate
 make e2e               # real processes: API + worker + Postgres + Redis, including kill-and-resume
 ```
@@ -171,13 +183,25 @@ What that does and does not cover:
 | Migrations, append-only event table, one-review-per-commit under concurrency, hybrid retrieval SQL, Redis checkpoints, ARQ | integration tests on real Postgres and Redis, both flavors in CI |
 | Hypertable, continuous aggregates and DiskANN index apply natively | `doctor --strict` in the Tiger CI job |
 | Webhook → queue → worker → database → posted review, crash and resume, degraded model | `make e2e` with a fake GitHub and a fake OpenAI-compatible model server over HTTP |
+| Real OpenAI reviews (`gpt-6.1-*`), on Windows | the demo and the golden set, run by hand on 2026-11-15; this exposed the category bug described below |
 
 | Not verified | Why |
 | --- | --- |
-| Calls to the real Anthropic and OpenAI APIs | No API key was available during the build. The Anthropic client is tested against a mocked transport and the OpenAI client against a local fake server. Run `make eval` with your key before trusting model reviews. |
+| Calls to the real Anthropic API | Tested against a mocked transport only. |
+| Model review quality, beyond one run | One real OpenAI evaluation so far (see below). Run `python -m backend.cli eval` with your own key before trusting model reviews. |
 | Posting to real GitHub through a GitHub App | Exercised against fakes only. Follow the smoke test in [docs/DEPLOY.md](docs/DEPLOY.md) on a scratch repository first. |
 | Docker images and the Railway deployment | The Dockerfiles and `docker-compose.yml` were written but never built: the build environment could not pull base images. |
 | Tiger Cloud itself | CI uses the `timescale/timescaledb-ha` image (same extensions), not the managed service. |
+
+### First real-model evaluation
+
+The first golden-set run against OpenAI (2026-11-15) scored security 7/7 with no false alarms, but quality,
+tests and docs missed four problems that the rule packs catch on their own. The cause: the prompts gave the
+model no fixed category labels, so it named problems in its own words, and rule-pack hits it did not repeat
+under the same label were silently dropped. Fixed in prompt `base.v2`: each specialist gets a label
+vocabulary, model labels are mapped onto it, and the model must report or explicitly dismiss (with a
+reason) every rule-pack lead. A lead it ignores is kept, so adding a model can never lower recall below
+the rule packs. Re-run `python -m backend.cli eval` to measure the fix.
 
 ## Project layout
 

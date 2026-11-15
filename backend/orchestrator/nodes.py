@@ -116,6 +116,12 @@ class ReviewNodes:
                 outcome="empty_result", error=f"{type(exc).__name__}: {exc}"[:500],
             )  # fmt: skip
             result = AgentResult(agent=agent.agent_type, status="error", error=f"{type(exc).__name__}: {exc}"[:300])
+        if result.dismissed_signals:
+            # A lead the model overruled is a decision: it belongs on the spine with its reason.
+            await s.emitter.emit(
+                EventType.DECISION, agent=agent.name, name="dismissed_signals", review_id=inp.review_id,
+                outcome=f"{len(result.dismissed_signals)} dismissed", dismissed=result.dismissed_signals,
+            )  # fmt: skip
         return {"agent_results": [result.model_dump(mode="json")]}
 
     # ---------------------------------------------------------------- aggregate

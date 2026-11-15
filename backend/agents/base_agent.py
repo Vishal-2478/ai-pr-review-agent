@@ -20,6 +20,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from backend.agents.categories import labels, normalise, prompt_section
 from backend.agents.contracts import AgentResult, Finding, LLMReviewOutput
 from backend.agents.grounding import ground_findings
 from backend.agents.rules import run_rules
@@ -43,6 +44,8 @@ from backend.tools.registry import ToolRegistry
 log = logging.getLogger(__name__)
 
 MAX_FINDINGS_PER_AGENT = 12
+MAX_PROMPT_SIGNALS = 20
+LEAD_LINE_TOLERANCE = 2
 
 
 @dataclass
@@ -161,7 +164,7 @@ class SpecialistAgent:
                 log.warning("%s: model %s failed: %s", self.name, model, exc)
                 continue
             result.model = model
-            result.findings = self._to_findings(parsed, signals)
+            result.findings, result.dismissed_signals = self._reconcile(parsed, signals)
             if omitted:
                 result.status = "degraded"
                 result.error = f"{len(omitted)} file(s) left out of the prompt for size: {', '.join(omitted[:5])}"
@@ -232,6 +235,14 @@ class SpecialistAgent:
             raise OutputValidationError(f"reply does not match the findings schema: {problems}") from exc
 
     def _to_findings(self, parsed: LLMReviewOutput, signals: list[Finding]) -> list[Finding]:
+        findings, _ = self._reconcile(parsed, signals)
+        return findings
+
+    def _reconcile(self, parsed: LLMReviewOutput, signals: list[Finding]) -> tuple[list[Finding], list[dict[str, str]]]:
+        """Combine what the model said with what the deterministic pre-checks found.
+
+        Returns the findings and the leads the model dismissed (with its reasons).
+        """
         findings: list[Finding] = []
         seen: set[str] = set()
         for raw in parsed.findings:
@@ -242,8 +253,8 @@ class SpecialistAgent:
             except ValueError:
                 severity = Severity.MEDIUM
             finding = Finding.build(
-                agent=self.agent_type, severity=severity, category=raw.category, summary=raw.summary,
-                file_path=raw.file_path, line_start=raw.line_start, line_end=raw.line_end,
+                agent=self.agent_type, severity=severity, category=normalise(self.agent_type, raw.category),
+                summary=raw.summary, file_path=raw.file_path, line_start=raw.line_start, line_end=raw.line_end,
                 confidence=raw.confidence, rationale=raw.rationale, suggestion=raw.suggestion,
                 evidence=raw.evidence, source="llm",
             )  # fmt: skip
@@ -252,31 +263,61 @@ class SpecialistAgent:
                 findings.append(finding)
         findings.sort(key=lambda f: (-f.severity.rank, -f.confidence))
         findings = findings[:MAX_FINDINGS_PER_AGENT]
-        # High-precision guard hits (real key formats, injection attempts) are
-        # reported even if the model chose to stay silent about them, and they
-        # outrank the model when both speak: the deterministic check owns the
-        # location and the severity, the model contributes the explanation. A
-        # model (or text that hijacked it) can therefore never talk a guard hit down.
-        for signal in signals:
-            if signal.source != "guard":
+
+        dismissed_by_id = {d.signal.upper(): d.reason.strip() for d in parsed.dismissed_signals if d.reason.strip()}
+        dismissed: list[dict[str, str]] = []
+        for number, signal in enumerate(signals[:MAX_PROMPT_SIGNALS], start=1):
+            twin = self._twin(findings, signal)
+            if signal.source == "guard":
+                # High-precision guard hits (real key formats, injection attempts) are
+                # reported even if the model stays silent or dismisses them, and they
+                # outrank the model when both speak: the deterministic check owns the
+                # location and the severity, the model contributes the explanation. A
+                # model (or text that hijacked it) can never talk a guard hit down.
+                if twin is None:
+                    findings.append(signal)
+                    continue
+                merged = signal.model_copy(deep=True)
+                if twin.severity.rank > merged.severity.rank:
+                    merged.severity = twin.severity
+                merged.rationale = twin.rationale or merged.rationale
+                merged.suggestion = twin.suggestion or merged.suggestion
+                merged.confidence = min(0.99, max(merged.confidence, twin.confidence))
+                merged.adjustments.append("deterministic check confirmed by the model")
+                findings[findings.index(twin)] = merged
                 continue
-            twin = next(
-                (f for f in findings if f.file_path == signal.file_path
-                 and abs(f.line_start - signal.line_start) <= 1 and f.category == signal.category),
-                None,
-            )  # fmt: skip
-            if twin is None:
-                findings.append(signal)
+
+            # Heuristic leads: the model is the judge, but it has to rule on each one.
+            if twin is not None:
+                if twin.category not in labels(self.agent_type) and signal.category in labels(self.agent_type):
+                    twin.category = signal.category  # keep feedback buckets stable
+                if signal.confidence > twin.confidence:
+                    twin.confidence = signal.confidence
+                twin.adjustments.append(f"agrees with pre-check {signal.category}")
                 continue
-            merged = signal.model_copy(deep=True)
-            if twin.severity.rank > merged.severity.rank:
-                merged.severity = twin.severity
-            merged.rationale = twin.rationale or merged.rationale
-            merged.suggestion = twin.suggestion or merged.suggestion
-            merged.confidence = min(0.99, max(merged.confidence, twin.confidence))
-            merged.adjustments.append("deterministic check confirmed by the model")
-            findings[findings.index(twin)] = merged
-        return findings
+            reason = dismissed_by_id.get(f"S{number}")
+            if reason:
+                dismissed.append({"signal": f"S{number}", "category": signal.category, "location": signal.location, "reason": reason[:300]})
+                continue
+            # Silence is not a verdict. The model can add to the rule packs, and can
+            # overrule a lead by saying why, but it cannot make one disappear by
+            # ignoring it: with a model configured, recall never drops below rules alone.
+            kept = signal.model_copy(deep=True)
+            kept.adjustments.append("pre-check lead the model neither reported nor dismissed")
+            findings.append(kept)
+        return findings, dismissed
+
+    @staticmethod
+    def _twin(findings: list[Finding], signal: Finding) -> Finding | None:
+        """A model finding about the same thing as a pre-check: same file, overlapping lines, same concern."""
+        for f in findings:
+            if f.file_path != signal.file_path:
+                continue
+            overlaps = f.line_start - LEAD_LINE_TOLERANCE <= signal.line_end and signal.line_start <= f.line_end + LEAD_LINE_TOLERANCE
+            if overlaps and (f.category == signal.category or f.category not in labels(f.agent_type)
+                             or signal.source != "guard"):
+                return f
+        return None
 
     def _user_prompt(
         self, inp: AgentInput, signals: list[Finding], diff_text: str, omitted: list[str], boundary: str
@@ -305,10 +346,16 @@ class SpecialistAgent:
                 f"({ctx.reason or 'index unavailable'}). You are seeing the diff only: lower your confidence "
                 "for anything that depends on code outside it."
             )
+        parts.append(prompt_section(self.agent_type))
         if signals:
             parts.append(
                 "## Pre-check signals for your concern (leads to verify, not conclusions)\n"
-                + "\n".join(f"- {s.location} [{s.category}] {s.summary}" for s in signals[:20])
+                "Rule on every signal: report it as a finding if it is real, or list it in `dismissed_signals` "
+                "with the reason it is not a problem here.\n"
+                + "\n".join(
+                    f"- S{n}: {s.location} [{s.category}] {s.summary}"
+                    for n, s in enumerate(signals[:MAX_PROMPT_SIGNALS], start=1)
+                )
             )
         parts.append("## Diff\n" + wrap_untrusted("diff", diff_text, boundary))
         if omitted:

@@ -202,13 +202,25 @@ class ScriptedLLMClient:
     ``script`` maps a tag (the agent name) to a reply or a list of replies used
     in order. A reply may be a JSON string, a dict, an exception to raise, or a
     callable ``(model, system, user) -> reply`` (sync or async).
+
+    By default it behaves like a model that follows the prompt contract: a dict
+    reply without ``dismissed_signals`` dismisses every pre-check signal (S1,
+    S2, ...) in the prompt. Pass ``rule_on_signals=False`` to imitate a model
+    that ignores them.
     """
 
     provider = "scripted"
+    _SIGNAL = re.compile(r"^- (S\d+): ", re.MULTILINE)
 
-    def __init__(self, script: dict[str, Scripted | list[Scripted]] | None = None, default: Scripted | None = None) -> None:
+    def __init__(
+        self,
+        script: dict[str, Scripted | list[Scripted]] | None = None,
+        default: Scripted | None = None,
+        rule_on_signals: bool = True,
+    ) -> None:
         self.script = {k: (list(v) if isinstance(v, list) else [v]) for k, v in (script or {}).items()}
         self.default: Scripted = default if default is not None else {"findings": []}
+        self.rule_on_signals = rule_on_signals
         self.calls: list[dict[str, str]] = []
 
     async def complete_json(
@@ -223,5 +235,9 @@ class ScriptedLLMClient:
                 reply = await reply
         if isinstance(reply, BaseException):
             raise reply
+        if self.rule_on_signals and isinstance(reply, dict) and "dismissed_signals" not in reply:
+            reply = {**reply, "dismissed_signals": [
+                {"signal": sid, "reason": "scripted: not a problem here"} for sid in self._SIGNAL.findall(user)
+            ]}  # fmt: skip
         text = reply if isinstance(reply, str) else json.dumps(reply)
         return LLMResponse(text=text, tokens_in=len(system + user) // 4, tokens_out=len(text) // 4, model=model, latency_ms=1)

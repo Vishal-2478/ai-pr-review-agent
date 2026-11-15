@@ -13,7 +13,7 @@ Check it yourself in about a minute:
 
 ```bash
 pip install -e ".[dev]"
-make test      # 148 tests (12 need TEST_DATABASE_URL / TEST_REDIS_URL and are skipped without them)
+make test      # 158 tests (12 need TEST_DATABASE_URL / TEST_REDIS_URL and are skipped without them)
 make lint
 make eval      # 17 golden cases, regression gate
 make demo

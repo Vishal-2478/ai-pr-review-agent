@@ -51,11 +51,20 @@ Smaller choices worth knowing:
   credential. Default and templated passwords in connection strings are now ignored, with a golden case
   (`local-dev-connection-string`) so it stays fixed.
 
+- **First real-model eval (OpenAI, 2026-11-15, run by the owner on Windows):** recall 67%, with
+  security 100% and quality/tests/docs 0–50%, all of which the rule packs alone catch. The model invented its
+  own category labels, and heuristic leads it did not repeat verbatim were dropped. Fix:
+  `backend/agents/categories.py` (vocabulary + synonyms), prompt `base.v2` (numbered leads, required
+  `dismissed_signals`), and `_reconcile` in `base_agent.py`. Leads are dropped only when the model gives a
+  reason, and those reasons are on the event spine. A first attempt trimmed ignored leads' confidence by
+  10%; a test showed that pushed low-severity leads under the gate threshold, so it was removed.
+
 ## Not verified
 
 | Area | State |
 | --- | --- |
-| Real Anthropic / OpenAI calls | Never made. Clients tested against a mocked transport and a local fake server. Model ids and prices were read from the providers' pricing pages on 2026-11-14. |
+| Real Anthropic calls | Never made; tested against a mocked transport. Model ids and prices were read from the providers' pricing pages on 2026-11-14. |
+| Real OpenAI calls | Demo and golden set run once by the owner (see above). The re-run after the category fix is pending. |
 | Real GitHub App | Never installed. The HTTP client is exercised against `scripts/dev/fake_services.py`, which imitates the endpoints used. |
 | Docker images, `docker compose`, Railway | Written, never built or deployed: base images could not be pulled in the build environment. |
 | Tiger Cloud | CI uses the `timescale/timescaledb-ha:pg17` image. The managed service was not used. |

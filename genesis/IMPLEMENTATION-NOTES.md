@@ -64,7 +64,7 @@ Smaller choices worth knowing:
 | Area | State |
 | --- | --- |
 | Real Anthropic calls | Never made; tested against a mocked transport. Model ids and prices were read from the providers' pricing pages on 2026-11-14. |
-| Real OpenAI calls | Demo and golden set run once by the owner (see above). The re-run after the category fix is pending. |
+| Real OpenAI calls | Demo and golden set run by the owner. After the category fix: 17/17, recall 100%, 0 false alarms, 0 leaks, $0.22. One run only: variance between runs is not measured. |
 | Real GitHub App | Never installed. The HTTP client is exercised against `scripts/dev/fake_services.py`, which imitates the endpoints used. |
 | Docker images, `docker compose`, Railway | Written, never built or deployed: base images could not be pulled in the build environment. |
 | Tiger Cloud | CI uses the `timescale/timescaledb-ha:pg17` image. The managed service was not used. |

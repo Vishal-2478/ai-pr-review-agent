@@ -31,7 +31,7 @@ Status is one of: **shown** (the demo command was run and behaved as described, 
 | M7 | Gate, human queue, posting | `python -m backend.cli demo --case hardcoded-secret --approve` | The critical finding escalates, nothing is posted before approval, and the public review leaves the secret out. | shown: `tests/test_hitl.py`, e2e `[hitl]`, and by clicking through the dashboard; **not shown** against real GitHub |
 | M8 | Reliability and economics | `make e2e` (the `[degrade]` scenario) | The security model is down; the review still completes with reduced coverage and the rule pack catches the injection. | shown: e2e `[degrade]`, `tests/test_reliability.py` |
 | M9 | Dashboard | `make demo-stack`, then `make dashboard` | Approval queue, review page with trace waterfall, costs page. | shown: built in CI; pages and an approval exercised in a headless browser (screenshots in `docs/images/`) |
-| M10 | Evaluation | `make eval` | 17 golden pull requests, recall and false alarms per agent, "regression gate: green". | shown in rule-pack mode; first OpenAI run found a bug (fixed, re-run pending) |
+| M10 | Evaluation | `make eval` | 17 golden pull requests, recall and false alarms per agent, "regression gate: green". | shown in rule-pack mode and with OpenAI (17/17 after fixing a bug the first run found); **not shown** with Anthropic |
 
 ## What is still open
 

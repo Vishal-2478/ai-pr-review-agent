@@ -183,7 +183,7 @@ What that does and does not cover:
 | Migrations, append-only event table, one-review-per-commit under concurrency, hybrid retrieval SQL, Redis checkpoints, ARQ | integration tests on real Postgres and Redis, both flavors in CI |
 | Hypertable, continuous aggregates and DiskANN index apply natively | `doctor --strict` in the Tiger CI job |
 | Webhook → queue → worker → database → posted review, crash and resume, degraded model | `make e2e` with a fake GitHub and a fake OpenAI-compatible model server over HTTP |
-| Real OpenAI reviews (`gpt-6.1-*`), on Windows | the demo and the golden set, run by hand on 2026-11-15; this exposed the category bug described below |
+| Real OpenAI reviews (`gpt-6.1-*`), on Windows | the demo and the golden set, run by hand on 2026-11-15: first run exposed the category bug described below, the re-run after the fix passed 17/17 |
 
 | Not verified | Why |
 | --- | --- |
@@ -201,7 +201,8 @@ model no fixed category labels, so it named problems in its own words, and rule-
 under the same label were silently dropped. Fixed in prompt `base.v2`: each specialist gets a label
 vocabulary, model labels are mapped onto it, and the model must report or explicitly dismiss (with a
 reason) every rule-pack lead. A lead it ignores is kept, so adding a model can never lower recall below
-the rule packs. Re-run `python -m backend.cli eval` to measure the fix.
+the rule packs. The re-run after the fix: 17/17 cases, recall 100% for every agent, no false alarms, no
+leaks, $0.22 for the whole set. That is one run on a small set, so model variance is not yet measured.
 
 ## Project layout
 

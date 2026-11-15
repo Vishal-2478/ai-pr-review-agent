@@ -1,0 +1,87 @@
+# Local stack. Two ways to use it:
+#
+#   make infra     Postgres (Tiger-compatible: TimescaleDB + pgvector + pgvectorscale) and Redis only;
+#                  run the API, worker and dashboard from your shell.
+#   make up        everything in containers, including the dashboard on http://localhost:3000
+#
+# In production the database is Tiger Cloud and Redis is a managed instance;
+# only the api, worker and dashboard services are deployed (see docs/DEPLOY.md).
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  TIGER_DATABASE_URL: postgresql://postgres:postgres@db:5432/prreview
+  REDIS_URL: redis://redis:6379/0
+  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+  GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+  GITHUB_PRIVATE_KEY: ${GITHUB_PRIVATE_KEY:-}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+  BOT_LOGIN: ${BOT_LOGIN:-}
+  ALLOWED_REPOS: ${ALLOWED_REPOS:-}
+  LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  AUTONOMY_LEVEL: ${AUTONOMY_LEVEL:-exceptions_only}
+  HITL_CONFIDENCE_THRESHOLD: ${HITL_CONFIDENCE_THRESHOLD:-0.6}
+  DAILY_BUDGET_USD: ${DAILY_BUDGET_USD:-5}
+  API_TOKENS: ${API_TOKENS:-}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: prreview
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/home/postgres/pgdata/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prreview"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes: ["redisdata:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    profiles: ["app"]
+    environment: *backend-env
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build: .
+    profiles: ["app"]
+    command: ["arq", "backend.job_queue.worker.WorkerSettings"]
+    environment: *backend-env
+    healthcheck: { disable: true }
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  dashboard:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    profiles: ["app"]
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  redisdata:

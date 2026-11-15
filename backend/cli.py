@@ -263,7 +263,7 @@ async def _send_webhook(args: argparse.Namespace) -> int:
 
 
 # ------------------------------------------------------------------------- doctor
-async def _doctor(_: argparse.Namespace) -> int:
+async def _doctor(args: argparse.Namespace) -> int:
     settings: Settings = get_settings()
     ok = True
 
@@ -296,6 +296,8 @@ async def _doctor(_: argparse.Namespace) -> int:
             line("database", "ok", f"Postgres {version}, flavor {report.flavor}")
             for name, reason in report.degraded.items():
                 line("  degraded", name, reason)
+            if report.degraded and args.strict:
+                ok = False
         except Exception as exc:  # noqa: BLE001
             ok = False
             line("database", "FAILING", f"{type(exc).__name__}: {exc}"[:160])
@@ -367,7 +369,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--number", type=int, default=7)
     sp.set_defaults(fn=None)
 
-    sub.add_parser("doctor", help="check configuration and connectivity").set_defaults(fn=_doctor)
+    doc = sub.add_parser("doctor", help="check configuration and connectivity")
+    doc.add_argument("--strict", action="store_true", help="exit 1 if a Tiger-specific migration fell back to plain Postgres")
+    doc.set_defaults(fn=_doctor)
     return parser
 
 

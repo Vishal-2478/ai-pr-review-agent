@@ -156,11 +156,13 @@ async def reset_schema(conn: Any) -> None:
     if "test" not in dbname:
         raise ConfigurationError(f"refusing to reset non-test database '{dbname}'")
     for view in ("agent_health_1m", "pr_cost_hourly"):
-        kind = await conn.fetchval("SELECT relkind FROM pg_class WHERE relname = $1", view)
-        if kind == b"m" or kind == "m":
-            await conn.execute(f"DROP MATERIALIZED VIEW IF EXISTS {view} CASCADE")
-        elif kind is not None:
-            await conn.execute(f"DROP VIEW IF EXISTS {view} CASCADE")
+        # A continuous aggregate must be dropped as a materialized view, a
+        # fallback rollup as a plain view. Try both; one of them applies.
+        for statement in (f"DROP MATERIALIZED VIEW IF EXISTS {view} CASCADE", f"DROP VIEW IF EXISTS {view} CASCADE"):
+            try:
+                await conn.execute(statement)
+            except Exception:  # noqa: BLE001, S112 - wrong kind of view for this statement
+                continue
     for table in (
         "agent_events", "hitl_feedback", "hitl_reviews", "finding_records", "pr_review_records",
         "code_chunks", "repo_file_index", "repo_conventions", "schema_migrations",

@@ -1,0 +1,103 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The production flavor: TimescaleDB + pgvector + pgvectorscale, as on Tiger Cloud.
+          - database: tiger
+            image: timescale/timescaledb-ha:pg17
+          # The fallback flavor: plain Postgres with pgvector only.
+          - database: plain-postgres
+            image: pgvector/pgvector:pg16
+    services:
+      postgres:
+        image: ${{ matrix.image }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prreview_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/prreview_test
+      TEST_REDIS_URL: redis://localhost:6379/5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check backend tests scripts
+      - name: Tests (unit + Postgres + Redis)
+        run: pytest -q
+      - name: Database flavor (the Tiger job fails if a hypertable, rollup or DiskANN migration fell back)
+        run: python -m backend.cli doctor ${{ matrix.database == 'tiger' && '--strict' || '' }}
+        env:
+          TIGER_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          REDIS_URL: ${{ env.TEST_REDIS_URL }}
+      - name: Regression gate (golden set)
+        run: python -m backend.cli eval --rules
+      - name: End-to-end drill (API + worker + queue, kill and resume)
+        run: |
+          python - <<'PY'
+          import asyncio, asyncpg
+          async def main():
+              conn = await asyncpg.connect("postgresql://postgres:postgres@localhost:5432/postgres")
+              await conn.execute("CREATE DATABASE prreview_e2e")
+              await conn.close()
+          asyncio.run(main())
+          PY
+          python -m scripts.dev.e2e
+        env:
+          TIGER_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/prreview_e2e
+          REDIS_URL: redis://localhost:6379/1
+      - name: Upload e2e logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ matrix.database }}
+          path: .local/e2e-logs
+
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build

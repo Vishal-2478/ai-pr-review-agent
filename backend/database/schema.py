@@ -25,6 +25,7 @@ OPTIONAL_EXTENSIONS = ("timescaledb", "vectorscale")
 _REQUIRES = re.compile(r"^--\s*requires:\s*(!?)([a-z_]+)\s*$", re.MULTILINE)
 
 
+MIGRATION_LOCK_KEY = 7_316_042_001  # arbitrary, stable: "pr-review-agent migrations"
 _PROVIDES = re.compile(r"^--\s*provides:\s*([a-z_]+)\s*$", re.MULTILINE)
 _OPTIONAL = re.compile(r"^--\s*optional\s*$", re.MULTILINE)
 
@@ -92,6 +93,16 @@ async def migrate(conn: Any, embedding_dim: int, migrations_dir: Path = MIGRATIO
 
     Each file is one implicit transaction, so a failed file leaves nothing behind.
     """
+    # The API and the worker start together and both migrate. A session-level
+    # advisory lock serialises them: the second one finds everything applied.
+    await conn.execute("SELECT pg_advisory_lock($1)", MIGRATION_LOCK_KEY)
+    try:
+        return await _migrate_locked(conn, embedding_dim, migrations_dir)
+    finally:
+        await conn.execute("SELECT pg_advisory_unlock($1)", MIGRATION_LOCK_KEY)
+
+
+async def _migrate_locked(conn: Any, embedding_dim: int, migrations_dir: Path) -> MigrationReport:
     report = MigrationReport(extensions=await ensure_extensions(conn))
     features = dict(report.extensions)
     await conn.execute(

@@ -61,6 +61,20 @@ class InMemoryStore:
         r = self.reviews.get(review_id)
         return dict(r) if r else None
 
+    async def supersede_waiting(self, repo: str, pr_number: int, keep_review_id: str, reason: str) -> list[str]:
+        ids = [
+            r["id"] for r in self.reviews.values()
+            if r["repo"] == repo and r["pr_number"] == pr_number and r["id"] != keep_review_id and r["status"] == "pending_human"
+        ]  # fmt: skip
+        for review_id in ids:
+            r = self.reviews[review_id]
+            r.update(status="superseded", completed_at=_iso(_now()), updated_at=_iso(_now()))
+            r["reasons"] = [*(r.get("reasons") or []), reason]
+            for h in self.hitl.values():
+                if h["review_id"] == review_id and h["status"] == "pending" and h["kind"] == "approval":
+                    h.update(status="expired", note=reason, resolved_at=_iso(_now()))
+        return ids
+
     async def update_review(self, review_id: str, completed: bool = False, **fields: Any) -> None:
         r = self.reviews[review_id]
         r.update(fields)

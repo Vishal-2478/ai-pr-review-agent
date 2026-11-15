@@ -59,8 +59,10 @@ def parse_event(event: str, payload: dict[str, Any], delivery_id: str, settings:
             return _ignored("comment was not newly created")
         comment = payload.get("comment") or {}
         body = comment.get("body") or ""
-        if settings.bot_login and sender.lower() == settings.bot_login.lower():
-            return _ignored("comment written by the agent itself")
+        author = comment.get("user") or {}
+        actor = author.get("login") or sender
+        if author.get("type") == "Bot" or (settings.bot_login and actor.lower() == settings.bot_login.lower()):
+            return _ignored("comment written by a bot")
         if event == "issue_comment":
             issue = payload.get("issue") or {}
             if "pull_request" not in issue:
@@ -74,7 +76,7 @@ def parse_event(event: str, payload: dict[str, Any], delivery_id: str, settings:
         actions = [
             WebhookAction(
                 kind="dispute", job="handle_dispute",
-                args=({"repo": repo, "pr_number": number, "finding_id": fid, "reason": reason, "actor": sender,
+                args=({"repo": repo, "pr_number": number, "finding_id": fid, "reason": reason, "actor": actor,
                        "installation_id": installation_id},),
                 job_id=f"dispute:{repo}:{number}:{fid}:{comment.get('id', delivery_id)}",
             )  # fmt: skip

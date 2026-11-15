@@ -253,13 +253,29 @@ class SpecialistAgent:
         findings.sort(key=lambda f: (-f.severity.rank, -f.confidence))
         findings = findings[:MAX_FINDINGS_PER_AGENT]
         # High-precision guard hits (real key formats, injection attempts) are
-        # reported even if the model chose to stay silent about them.
+        # reported even if the model chose to stay silent about them, and they
+        # outrank the model when both speak: the deterministic check owns the
+        # location and the severity, the model contributes the explanation. A
+        # model (or text that hijacked it) can therefore never talk a guard hit down.
         for signal in signals:
-            if signal.source == "guard" and not any(
-                f.file_path == signal.file_path and abs(f.line_start - signal.line_start) <= 1
-                and f.category == signal.category for f in findings
-            ):  # fmt: skip
+            if signal.source != "guard":
+                continue
+            twin = next(
+                (f for f in findings if f.file_path == signal.file_path
+                 and abs(f.line_start - signal.line_start) <= 1 and f.category == signal.category),
+                None,
+            )  # fmt: skip
+            if twin is None:
                 findings.append(signal)
+                continue
+            merged = signal.model_copy(deep=True)
+            if twin.severity.rank > merged.severity.rank:
+                merged.severity = twin.severity
+            merged.rationale = twin.rationale or merged.rationale
+            merged.suggestion = twin.suggestion or merged.suggestion
+            merged.confidence = min(0.99, max(merged.confidence, twin.confidence))
+            merged.adjustments.append("deterministic check confirmed by the model")
+            findings[findings.index(twin)] = merged
         return findings
 
     def _user_prompt(

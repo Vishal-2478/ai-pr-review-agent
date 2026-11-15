@@ -31,6 +31,7 @@ class Store(Protocol):
     # ---- truth: reviews & findings
     async def create_review(self, pr: PRContext) -> tuple[str, bool]: ...
     async def get_review(self, review_id: str) -> dict[str, Any] | None: ...
+    async def supersede_waiting(self, repo: str, pr_number: int, keep_review_id: str, reason: str) -> list[str]: ...
     async def update_review(self, review_id: str, completed: bool = False, **fields: Any) -> None: ...
     async def list_reviews(self, limit: int = 50, status: str | None = None, repo: str | None = None) -> list[dict[str, Any]]: ...
     async def save_findings(self, review_id: str, repo: str, pr_number: int, findings: list[Finding]) -> None: ...
@@ -126,6 +127,33 @@ class PostgresStore:
     async def get_review(self, review_id: str) -> dict[str, Any] | None:
         row = await self.pool.fetchrow("SELECT * FROM pr_review_records WHERE id = $1", uuid.UUID(review_id))
         return normalize_row(row) if row else None
+
+    async def supersede_waiting(self, repo: str, pr_number: int, keep_review_id: str, reason: str) -> list[str]:
+        """A newer commit arrived: reviews of older commits still waiting for approval are moot.
+
+        Their approval items expire so nobody approves comments onto a stale
+        commit. Escalations are left alone on purpose: a leaked credential is
+        still leaked after the next push, and a human must still look.
+        """
+        async with self.pool.acquire() as conn, conn.transaction():
+            rows = await conn.fetch(
+                """
+                UPDATE pr_review_records
+                   SET status = 'superseded', completed_at = now(), updated_at = now(),
+                       reasons = reasons || to_jsonb($4::text)
+                 WHERE repo = $1 AND pr_number = $2 AND id <> $3 AND status = 'pending_human'
+             RETURNING id
+                """,
+                repo, pr_number, uuid.UUID(keep_review_id), reason,
+            )  # fmt: skip
+            ids = [r["id"] for r in rows]
+            if ids:
+                await conn.execute(
+                    "UPDATE hitl_reviews SET status = 'expired', note = $2, resolved_at = now() "
+                    "WHERE review_id = ANY($1::uuid[]) AND status = 'pending' AND kind = 'approval'",
+                    ids, reason,
+                )  # fmt: skip
+        return [str(i) for i in ids]
 
     async def update_review(self, review_id: str, completed: bool = False, **fields: Any) -> None:
         unknown = set(fields) - _REVIEW_COLUMNS

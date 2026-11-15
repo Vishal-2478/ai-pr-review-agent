@@ -19,7 +19,7 @@ import secrets
 from dataclasses import dataclass
 
 _SIGNALS: list[tuple[str, re.Pattern[str]]] = [
-    ("override-instructions", re.compile(r"(?i)\b(?:ignore|disregard|forget|override)\b[^.\n]{0,40}\b(?:previous|prior|above|earlier|all|your)\b[^.\n]{0,30}\b(?:instruction|prompt|rule|guideline|context)s?")),
+    ("override-instructions", re.compile(r"(?i)\b(?:ignore|disregard|forget|override)\b[^.\n]{0,40}\b(?:previous|prior|above|earlier|all|your|system)\b[^.\n]{0,30}\b(?:instruction|prompt|rule|guideline|context)s?")),
     ("role-reassignment", re.compile(r"(?i)\byou are (?:now|no longer)\b|\bact as (?:an?|the) (?:different|new|unrestricted)|\bnew (?:system )?(?:instructions?|role)\s*:")),
     ("reviewer-steering", re.compile(r"(?i)\b(?:ai|llm|assistant|reviewer|review bot|agent)s?\b[^.\n]{0,60}\b(?:must|should|shall|needs? to|please)\b[^.\n]{0,40}\b(?:approve|lgtm|not (?:report|flag|mention)|skip|ignore|no (?:issues|findings|vulnerabilit))")),
     ("verdict-forcing", re.compile(r"(?i)\b(?:report|return|output|respond with|say)\b[^.\n]{0,30}\b(?:no (?:issues|findings|problems|vulnerabilities)|empty (?:list|findings)|\"findings\"\s*:\s*\[\s*\])")),

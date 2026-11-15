@@ -60,6 +60,15 @@ async def review_pull_request(services: Services, job: dict[str, Any]) -> dict[s
             )  # fmt: skip
             return {"review_id": review_id, "status": ReviewStatus.SUPERSEDED.value}
 
+    if created:
+        # Reviews of older commits that are still waiting for approval are now moot.
+        stale = await s.store.supersede_waiting(pr.repo, pr.pr_number, review_id, f"superseded by {pr.head_sha[:7]}")
+        if stale:
+            await s.emitter.emit(
+                EventType.DECISION, agent="orchestrator", name="superseded", review_id=review_id,
+                outcome="superseded", superseded_reviews=stale,
+            )  # fmt: skip
+
     payload: dict[str, Any] = {"review_id": review_id, "pr": pr.model_dump()}
     if job.get("files"):
         payload["files"] = job["files"]

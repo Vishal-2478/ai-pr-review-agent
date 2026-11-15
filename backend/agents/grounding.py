@@ -22,7 +22,7 @@ from backend.models.schemas import DiffFile, RetrievedContext
 from backend.security.secret_masking import mask
 
 UNGROUNDED_FACTOR = 0.55
-OUTSIDE_CHANGE_FACTOR = 0.4
+OUTSIDE_CHANGE_FACTOR = 0.25  # neither in the diff nor in retrieved code: always lands under the default noise floor
 NO_EVIDENCE_FACTOR = 0.8
 
 
@@ -50,7 +50,9 @@ def _locate(evidence: str, parsed: ParsedPatch) -> int | None:
         if len(needle) < 6:
             continue
         for line_no in sorted(parsed.commentable):
-            if needle in _norm(parsed.text_at(line_no) or ""):
+            text = parsed.text_at(line_no) or ""
+            # The model was shown the diff with secrets masked, so it may quote the masked form.
+            if needle in _norm(text) or needle in _norm(mask(text)):
                 return line_no
         return None  # the first meaningful line decides
     return None

@@ -212,13 +212,15 @@ async def _index_local(args: argparse.Namespace) -> int:
 
 
 # ------------------------------------------------------------------- send-webhook
-def sample_payload(repo: str = "acme/shop", number: int = 7, sha: str | None = None, action: str = "opened") -> dict[str, Any]:
+def sample_payload(
+    repo: str = "acme/shop", number: int = 7, sha: str | None = None, action: str = "opened", title: str = "Add user lookup"
+) -> dict[str, Any]:
     sha = sha or uuid.uuid4().hex + uuid.uuid4().hex[:8]
     return {
         "action": action,
         "number": number,
         "pull_request": {
-            "number": number, "state": "open", "draft": False, "title": "Add user lookup",
+            "number": number, "state": "open", "draft": False, "title": title,
             "body": "Adds a lookup helper.", "html_url": f"https://github.com/{repo}/pull/{number}",
             "user": {"login": "octocat"}, "head": {"sha": sha, "ref": "feature"},
             "base": {"sha": "0" * 40, "ref": "main"},

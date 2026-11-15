@@ -149,7 +149,7 @@ async def test_review_still_runs_when_retrieval_is_down(make_services):
         raise ConnectionError("vector index unavailable")
 
     services.store.search_vector = broken  # type: ignore[method-assign]
-    services.store.search_lexical = broken  # type: ignore[method-assign]
+    services.store.search_text = broken  # type: ignore[method-assign]
     result = await jobs.review_pull_request(services, open_pull(services))
     review = await services.store.get_review(result["review_id"])
     assert review["status"] in ("posted", "pending_human", "clean")

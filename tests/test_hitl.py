@@ -98,7 +98,7 @@ async def test_critical_always_escalates_and_is_withheld_from_a_public_pr(make_s
 async def test_a_maintainer_can_choose_to_publish_a_withheld_finding(make_services):
     case = get_case("hardcoded-secret")
     services = make_services(llm=ScriptedLLMClient())
-    result = await jobs.review_pull_request(services, open_pull(services, case.diff))
+    await jobs.review_pull_request(services, open_pull(services, case.diff))
     item = (await services.store.list_hitl("pending"))[0]
     await services.approvals.decide(item["id"], HitlDecisionRequest(action="approve", publish_withheld=True), "alice")
     posted = services.github.reviews[("acme/shop", 1)][0]

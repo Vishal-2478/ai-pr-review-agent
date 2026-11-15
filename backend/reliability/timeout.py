@@ -18,5 +18,5 @@ T = TypeVar("T")
 async def with_timeout(awaitable: Awaitable[T], seconds: float, label: str) -> T:
     try:
         return await asyncio.wait_for(awaitable, timeout=seconds)
-    except (asyncio.TimeoutError, TimeoutError) as exc:
+    except TimeoutError as exc:
         raise NodeTimeoutError(label, seconds) from exc

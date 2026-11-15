@@ -15,7 +15,6 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # Default model per role for each provider. Any MODEL_* setting overrides its entry.
 PROVIDER_MODELS: dict[str, dict[str, str]] = {
     "openai": {

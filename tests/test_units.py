@@ -17,7 +17,7 @@ from backend.evaluation.judge import match_case
 from backend.evaluation.regression_gate import check_against_baseline, load_baseline, run_eval
 from backend.hitl.gate import apply_gate
 from backend.integrations.diff import parse_patch, parse_unified_diff, render_diff
-from backend.models.enums import AgentType, FindingStatus, GateDecision, Severity
+from backend.models.enums import AgentType, GateDecision, Severity
 from backend.models.schemas import RetrievedContext
 from backend.tools.llm_client import AnthropicClient, extract_json
 from tests.conftest import SQLI_DIFF, make_settings

@@ -110,7 +110,7 @@ async def _open_pr(client: httpx.AsyncClient, case_id: str, number: int) -> tupl
     repo = "acme/shop"
     r = await client.post(f"{FAKE}/_admin/pulls", json={"repo": repo, "number": number, "sha": sha, "diff": case.diff, "title": case.title})
     r.raise_for_status()
-    return sample_payload(repo, number, sha), sha
+    return sample_payload(repo, number, sha, title=case.title), sha
 
 
 async def _review_for(client: httpx.AsyncClient, sha: str, *, until: set[str], timeout: float = 60.0) -> dict[str, Any]:

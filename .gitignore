@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.private-key
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# Local runtime
+.local/
+*.log
+.DS_Store
+
+# Genesis raw traces stay local
+.genesis/local/

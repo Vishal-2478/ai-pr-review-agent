@@ -40,7 +40,7 @@ pr-review = "backend.cli:main"
 include = ["backend*", "scripts*"]
 
 [tool.setuptools.package-data]
-backend = ["prompts/templates/*.md", "economics/pricing.json", "evaluation/golden/*.json"]
+backend = ["prompts/templates/*.md", "economics/pricing.json", "evaluation/baseline.json"]
 scripts = ["migrations/*.sql"]
 
 [tool.pytest.ini_options]

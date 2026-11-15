@@ -36,6 +36,14 @@ _PLACEHOLDER = re.compile(
     r"(?i)^(?:x{3,}|\*{3,}|changeme|change[-_]me|example|placeholder|your[-_ ].*|<.*>|\$\{.*\}|dummy|test|password|secret|none|null|todo)$"
 )
 
+# Passwords in a connection string that are defaults or template variables, not
+# secrets: `postgres:postgres@localhost` in a compose file is not a leak, and
+# escalating it as one teaches people to ignore the reviewer.
+_DEFAULT_PASSWORD = re.compile(
+    r"(?i)^(?:postgres|password|passwd|pass|root|admin|guest|user|example|changeme|change[-_]me|secret|test|dev|local"
+    r"|redis|mysql|mongo|rabbitmq|x{3,}|\*{3,}|<.*>|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?.*|\{.*\}|%s|your[-_ ].*)$"
+)
+
 
 @dataclass(frozen=True)
 class SecretHit:
@@ -55,6 +63,8 @@ def find_secrets(text: str) -> list[SecretHit]:
             start, end = m.span(group)
             value = m.group(group)
             if kind == "hardcoded-credential" and _PLACEHOLDER.match(value.strip()):
+                continue
+            if kind == "connection-string" and _DEFAULT_PASSWORD.match(value.strip()):
                 continue
             if any(s <= start < e or s < end <= e for s, e in taken):
                 continue

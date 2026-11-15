@@ -1,6 +1,6 @@
 {
   "rules": {
-    "cases": 16,
+    "cases": 17,
     "decision_accuracy": 1.0,
     "forbidden_hits": 0,
     "recall": 1.0,

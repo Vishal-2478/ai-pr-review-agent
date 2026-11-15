@@ -138,6 +138,21 @@ GOLDEN_CASES: tuple[GoldenCase, ...] = (
         tags=("precision",),
     ),
     GoldenCase(
+        id="local-dev-connection-string",
+        title="Add compose file for local development",
+        diff=new_file("docker-compose.dev.yml", """
+            services:
+              api:
+                environment:
+                  DATABASE_URL: postgresql://postgres:postgres@db:5432/app
+                  REDIS_URL: redis://localhost:6379/0
+                  REPLICA_URL: postgresql://app:${DB_PASSWORD}@replica:5432/app
+        """),
+        forbid=("hardcoded-secret",),
+        decisions=("no_findings", "auto_post"),
+        tags=("precision",),
+    ),
+    GoldenCase(
         id="command-injection-shell",
         title="Add git log helper",
         diff=new_file("tools/gitlog.py", '''

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
-BACKEND = Path(__file__).resolve().parent.parent / "backend"
+ROOT = Path(__file__).resolve().parent.parent
+BACKEND = ROOT / "backend"
 
 
 def _imports(path: Path) -> set[str]:
@@ -77,3 +79,31 @@ def test_every_prompt_is_a_versioned_file():
     assert all(".v" in name for name in templates)
     for agent in ("security", "quality", "tests", "docs", "base"):
         assert any(name.startswith(agent + ".v") for name in templates)
+
+
+def test_context_graph_matches_the_code():
+    """genesis/context-graph.json is documentation that cannot drift: it is checked against the source."""
+    import json
+
+    graph = json.loads((ROOT / "genesis" / "context-graph.json").read_text())
+    nodes = {n["id"] for n in graph["nodes"]}
+
+    actual = set()
+    for path in BACKEND.rglob("*.py"):
+        parts = path.relative_to(BACKEND).parts
+        src = parts[0].removesuffix(".py") if len(parts) == 1 else parts[0]
+        if src not in nodes:
+            continue
+        for match in re.finditer(r"^\s*(?:from|import) backend\.([a-z_]+)", path.read_text(), re.MULTILINE):
+            if match.group(1) != src and match.group(1) in nodes:
+                actual.add((src, match.group(1)))
+    declared = {(e["from"], e["to"]) for e in graph["edges"]}
+    assert declared == actual, f"undeclared: {sorted(actual - declared)}; stale: {sorted(declared - actual)}"
+
+    defined = set()
+    for path in (ROOT / "tests").glob("test_*.py"):
+        defined.update(re.findall(r"def (test_[a-z0-9_]+)", path.read_text()))
+    for invariant in graph["invariants"]:
+        assert invariant["tests"], f"{invariant['id']} has no enforcing test"
+        missing = [t for t in invariant["tests"] if t not in defined]
+        assert not missing, f"{invariant['id']} names tests that do not exist: {missing}"

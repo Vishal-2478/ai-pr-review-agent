@@ -1,0 +1,611 @@
+{
+  "about": "Modules, the dependencies between them as they exist in the code, and the invariants that must hold. tests/test_architecture.py checks that every test named here exists and that the edges match the imports.",
+  "nodes": [
+    {
+      "id": "core",
+      "role": "WorkflowEngine interface and the exception taxonomy. Imports nothing else."
+    },
+    {
+      "id": "models",
+      "role": "Enums and plain data that cross module boundaries. Imports nothing else."
+    },
+    {
+      "id": "config",
+      "role": "Every setting, in one file."
+    },
+    {
+      "id": "webhook_receiver",
+      "role": "Verify, parse, deduplicate, enqueue, acknowledge."
+    },
+    {
+      "id": "job_queue",
+      "role": "Queue port (ARQ or inline), worker, job bodies."
+    },
+    {
+      "id": "orchestrator",
+      "role": "Workflow nodes; LangGraph and asyncio engines; Redis checkpointer."
+    },
+    {
+      "id": "agents",
+      "role": "Finding contract, four specialists, rule packs, grounding, aggregator."
+    },
+    {
+      "id": "memory",
+      "role": "Embedders and the hybrid context retriever."
+    },
+    {
+      "id": "data",
+      "role": "Chunking and repository indexing."
+    },
+    {
+      "id": "hitl",
+      "role": "Gate, approval queue, disputes, feedback calibration, capacity alerts."
+    },
+    {
+      "id": "integrations",
+      "role": "GitHub client, diff parser, review formatter, publisher."
+    },
+    {
+      "id": "database",
+      "role": "Store port with Postgres and in-memory implementations; migration runner."
+    },
+    {
+      "id": "observability",
+      "role": "Event spine, audit, alerting, logging."
+    },
+    {
+      "id": "reliability",
+      "role": "Retry, circuit breaker, timeout, idempotency."
+    },
+    {
+      "id": "security",
+      "role": "Secret masking, prompt-injection guard, roles."
+    },
+    {
+      "id": "economics",
+      "role": "Pricing, budget guard, routing advice."
+    },
+    {
+      "id": "tools",
+      "role": "Model client boundary, model router, tool registry."
+    },
+    {
+      "id": "prompts",
+      "role": "Versioned prompt files and their registry."
+    },
+    {
+      "id": "evaluation",
+      "role": "Golden set, judges, regression gate."
+    },
+    {
+      "id": "api",
+      "role": "Dashboard REST API."
+    },
+    {
+      "id": "container",
+      "role": "Composition root: the only place concrete implementations are chosen."
+    }
+  ],
+  "edges": [
+    {
+      "from": "agents",
+      "to": "config"
+    },
+    {
+      "from": "agents",
+      "to": "core"
+    },
+    {
+      "from": "agents",
+      "to": "economics"
+    },
+    {
+      "from": "agents",
+      "to": "integrations"
+    },
+    {
+      "from": "agents",
+      "to": "models"
+    },
+    {
+      "from": "agents",
+      "to": "observability"
+    },
+    {
+      "from": "agents",
+      "to": "prompts"
+    },
+    {
+      "from": "agents",
+      "to": "reliability"
+    },
+    {
+      "from": "agents",
+      "to": "security"
+    },
+    {
+      "from": "agents",
+      "to": "tools"
+    },
+    {
+      "from": "api",
+      "to": "container"
+    },
+    {
+      "from": "api",
+      "to": "economics"
+    },
+    {
+      "from": "api",
+      "to": "hitl"
+    },
+    {
+      "from": "api",
+      "to": "models"
+    },
+    {
+      "from": "api",
+      "to": "observability"
+    },
+    {
+      "from": "api",
+      "to": "security"
+    },
+    {
+      "from": "container",
+      "to": "agents"
+    },
+    {
+      "from": "container",
+      "to": "config"
+    },
+    {
+      "from": "container",
+      "to": "core"
+    },
+    {
+      "from": "container",
+      "to": "data"
+    },
+    {
+      "from": "container",
+      "to": "database"
+    },
+    {
+      "from": "container",
+      "to": "economics"
+    },
+    {
+      "from": "container",
+      "to": "hitl"
+    },
+    {
+      "from": "container",
+      "to": "integrations"
+    },
+    {
+      "from": "container",
+      "to": "job_queue"
+    },
+    {
+      "from": "container",
+      "to": "memory"
+    },
+    {
+      "from": "container",
+      "to": "observability"
+    },
+    {
+      "from": "container",
+      "to": "orchestrator"
+    },
+    {
+      "from": "container",
+      "to": "prompts"
+    },
+    {
+      "from": "container",
+      "to": "reliability"
+    },
+    {
+      "from": "container",
+      "to": "tools"
+    },
+    {
+      "from": "data",
+      "to": "economics"
+    },
+    {
+      "from": "data",
+      "to": "integrations"
+    },
+    {
+      "from": "data",
+      "to": "memory"
+    },
+    {
+      "from": "data",
+      "to": "models"
+    },
+    {
+      "from": "data",
+      "to": "observability"
+    },
+    {
+      "from": "database",
+      "to": "agents"
+    },
+    {
+      "from": "database",
+      "to": "core"
+    },
+    {
+      "from": "database",
+      "to": "models"
+    },
+    {
+      "from": "evaluation",
+      "to": "config"
+    },
+    {
+      "from": "evaluation",
+      "to": "container"
+    },
+    {
+      "from": "evaluation",
+      "to": "database"
+    },
+    {
+      "from": "evaluation",
+      "to": "integrations"
+    },
+    {
+      "from": "evaluation",
+      "to": "job_queue"
+    },
+    {
+      "from": "evaluation",
+      "to": "models"
+    },
+    {
+      "from": "evaluation",
+      "to": "observability"
+    },
+    {
+      "from": "evaluation",
+      "to": "prompts"
+    },
+    {
+      "from": "evaluation",
+      "to": "tools"
+    },
+    {
+      "from": "hitl",
+      "to": "agents"
+    },
+    {
+      "from": "hitl",
+      "to": "config"
+    },
+    {
+      "from": "hitl",
+      "to": "models"
+    },
+    {
+      "from": "hitl",
+      "to": "observability"
+    },
+    {
+      "from": "integrations",
+      "to": "config"
+    },
+    {
+      "from": "integrations",
+      "to": "core"
+    },
+    {
+      "from": "integrations",
+      "to": "data"
+    },
+    {
+      "from": "integrations",
+      "to": "models"
+    },
+    {
+      "from": "integrations",
+      "to": "observability"
+    },
+    {
+      "from": "integrations",
+      "to": "reliability"
+    },
+    {
+      "from": "integrations",
+      "to": "security"
+    },
+    {
+      "from": "job_queue",
+      "to": "config"
+    },
+    {
+      "from": "job_queue",
+      "to": "container"
+    },
+    {
+      "from": "job_queue",
+      "to": "integrations"
+    },
+    {
+      "from": "job_queue",
+      "to": "memory"
+    },
+    {
+      "from": "job_queue",
+      "to": "models"
+    },
+    {
+      "from": "job_queue",
+      "to": "observability"
+    },
+    {
+      "from": "job_queue",
+      "to": "reliability"
+    },
+    {
+      "from": "memory",
+      "to": "core"
+    },
+    {
+      "from": "memory",
+      "to": "economics"
+    },
+    {
+      "from": "memory",
+      "to": "integrations"
+    },
+    {
+      "from": "memory",
+      "to": "models"
+    },
+    {
+      "from": "memory",
+      "to": "observability"
+    },
+    {
+      "from": "memory",
+      "to": "reliability"
+    },
+    {
+      "from": "observability",
+      "to": "models"
+    },
+    {
+      "from": "observability",
+      "to": "security"
+    },
+    {
+      "from": "orchestrator",
+      "to": "agents"
+    },
+    {
+      "from": "orchestrator",
+      "to": "container"
+    },
+    {
+      "from": "orchestrator",
+      "to": "core"
+    },
+    {
+      "from": "orchestrator",
+      "to": "hitl"
+    },
+    {
+      "from": "orchestrator",
+      "to": "models"
+    },
+    {
+      "from": "orchestrator",
+      "to": "reliability"
+    },
+    {
+      "from": "reliability",
+      "to": "core"
+    },
+    {
+      "from": "security",
+      "to": "models"
+    },
+    {
+      "from": "tools",
+      "to": "config"
+    },
+    {
+      "from": "tools",
+      "to": "core"
+    },
+    {
+      "from": "tools",
+      "to": "economics"
+    },
+    {
+      "from": "tools",
+      "to": "models"
+    },
+    {
+      "from": "tools",
+      "to": "reliability"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "api"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "config"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "container"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "core"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "hitl"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "integrations"
+    },
+    {
+      "from": "webhook_receiver",
+      "to": "models"
+    }
+  ],
+  "invariants": [
+    {
+      "id": "I1",
+      "statement": "Nothing in a webhook is parsed or trusted before its signature verifies.",
+      "owners": [
+        "webhook_receiver"
+      ],
+      "tests": [
+        "test_signature_is_checked_before_the_body_is_parsed",
+        "test_missing_secret_fails_closed"
+      ]
+    },
+    {
+      "id": "I2",
+      "statement": "One review per commit, however many times the event arrives.",
+      "owners": [
+        "webhook_receiver",
+        "job_queue",
+        "database"
+      ],
+      "tests": [
+        "test_same_commit_under_a_new_delivery_id_does_not_review_twice",
+        "test_one_review_per_commit_under_concurrency"
+      ]
+    },
+    {
+      "id": "I3",
+      "statement": "The ingress does no review work.",
+      "owners": [
+        "webhook_receiver"
+      ],
+      "tests": [
+        "test_ingress_does_no_review_work"
+      ]
+    },
+    {
+      "id": "I4",
+      "statement": "A slow or failing specialist never blocks the others or the join.",
+      "owners": [
+        "orchestrator",
+        "agents"
+      ],
+      "tests": [
+        "test_a_hung_specialist_cannot_deadlock_the_join",
+        "test_model_failure_degrades_to_deterministic_rules"
+      ]
+    },
+    {
+      "id": "I5",
+      "statement": "A finding that cannot be grounded in the diff never reaches the pull request on its own authority.",
+      "owners": [
+        "agents",
+        "hitl"
+      ],
+      "tests": [
+        "test_hallucinated_location_never_reaches_the_pull_request"
+      ]
+    },
+    {
+      "id": "I6",
+      "statement": "Routing is deterministic code; a critical finding always goes to a human.",
+      "owners": [
+        "hitl"
+      ],
+      "tests": [
+        "test_the_gate_is_deterministic_code",
+        "test_gate_decision_table",
+        "test_a_model_cannot_talk_a_deterministic_critical_down"
+      ]
+    },
+    {
+      "id": "I7",
+      "statement": "Nothing is posted while a human decision is pending, and a review is posted at most once.",
+      "owners": [
+        "hitl",
+        "integrations"
+      ],
+      "tests": [
+        "test_nothing_is_posted_until_a_human_decides",
+        "test_two_reviewers_cannot_decide_the_same_item"
+      ]
+    },
+    {
+      "id": "I8",
+      "statement": "Secrets found in a diff are masked before a model, a log, the database or GitHub sees them.",
+      "owners": [
+        "security",
+        "agents"
+      ],
+      "tests": [
+        "test_secrets_in_the_diff_are_masked_before_the_model_sees_them",
+        "test_golden_set_passes_the_regression_gate_in_rules_mode"
+      ]
+    },
+    {
+      "id": "I9",
+      "statement": "Text in a pull request is data, never instruction.",
+      "owners": [
+        "security",
+        "agents"
+      ],
+      "tests": [
+        "test_prompt_injection_in_the_diff_is_data_not_instruction"
+      ]
+    },
+    {
+      "id": "I10",
+      "statement": "The event log is append-only and every step writes to it.",
+      "owners": [
+        "observability",
+        "database"
+      ],
+      "tests": [
+        "test_event_spine_is_append_only",
+        "test_every_step_is_on_the_event_spine"
+      ]
+    },
+    {
+      "id": "I11",
+      "statement": "Only the orchestrator knows the workflow framework; specialists never import a vendor SDK; core and models depend on nothing.",
+      "owners": [
+        "core",
+        "orchestrator",
+        "agents"
+      ],
+      "tests": [
+        "test_only_the_orchestrator_knows_langgraph",
+        "test_specialists_never_talk_to_a_vendor_sdk",
+        "test_core_and_models_depend_on_nothing_else"
+      ]
+    },
+    {
+      "id": "I12",
+      "statement": "Money is checked before it is spent.",
+      "owners": [
+        "economics",
+        "agents"
+      ],
+      "tests": [
+        "test_budget_guard_blocks_at_the_cap_and_downgrades_before_it",
+        "test_budget_exhaustion_falls_back_to_rules"
+      ]
+    }
+  ]
+}

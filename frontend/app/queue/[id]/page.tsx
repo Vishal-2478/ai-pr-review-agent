@@ -21,6 +21,20 @@ interface Outcome {
   publishing?: boolean;
 }
 
+function published(accepted: number, rejected: number, keptPrivate: number): string {
+  const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  const posted = Math.max(0, accepted - keptPrivate);
+  const parts: string[] = [];
+  if (posted > 0) parts.push(`Publishing ${count(posted, "accepted finding")} to the pull request.`);
+  if (keptPrivate > 0) {
+    parts.push(
+      `${count(keptPrivate, "critical security finding")} accepted and kept private${posted > 0 ? "." : ": nothing is posted on the pull request."}`,
+    );
+  }
+  parts.push(`${rejected} rejected.`);
+  return parts.join(" ");
+}
+
 export default function DecidePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -31,6 +45,7 @@ export default function DecidePage() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<ApiError | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [keptPrivate, setKeptPrivate] = useState(0);
 
   if (error) return <Problem error={error} />;
   if (!data) return <p className="empty">Loading the review.</p>;
@@ -53,7 +68,12 @@ export default function DecidePage() {
         publish_withheld: publishWithheld,
         findings: Object.entries(verdicts).map(([finding_id, verdict]) => ({ finding_id, verdict })),
       };
+      // Counted now, because the findings change status as soon as the decision lands.
+      const privateNow = publishWithheld
+        ? 0
+        : accepted.filter((f) => f.severity === "critical" && f.agent_type === "security").length;
       setOutcome(await api<Outcome>(`/api/hitl/${id}/decision`, { method: "POST", body: JSON.stringify(body) }));
+      setKeptPrivate(action === "approve" ? privateNow : 0);
     } catch (e) {
       setFailure(e as ApiError);
     } finally {
@@ -103,7 +123,7 @@ export default function DecidePage() {
                 ? "Recorded: the finding stands."
                 : "Recorded: the finding is retracted and the author has been told."
               : outcome.publishing
-                ? `Publishing ${outcome.accepted} accepted ${outcome.accepted === 1 ? "finding" : "findings"} to the pull request. ${outcome.rejected || 0} rejected.`
+                ? published(outcome.accepted || 0, outcome.rejected || 0, keptPrivate)
                 : "Rejected. Nothing was posted."}{" "}
             Your decision is saved as feedback and adjusts how confident the agent is next time.
           </p>
